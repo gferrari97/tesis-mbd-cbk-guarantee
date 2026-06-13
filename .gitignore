@@ -1,0 +1,14 @@
+# Aislamiento del entorno virtual de desarrollo de macOS
+.venv_tesis/
+venv/
+.venv/
+
+# Caché de ejecución del intérprete de Python
+**/__pycache__/
+*.pyc
+
+# Archivos ocultos del sistema operativo origen
+.DS_Store
+
+# Exclusión absoluta de la capa de datos locales
+data/
