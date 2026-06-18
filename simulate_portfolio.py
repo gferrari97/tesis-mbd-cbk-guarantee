@@ -115,7 +115,8 @@ def run_montecarlo_simulation():
     resultados = {
         'tasas_simuladas': tasas_simuladas,
         'impacto_total_merchants': impacto_total_merchants,
-        'perdida_portafolio_agregada': perdida_portafolio_agregada
+        'perdida_portafolio_agregada': perdida_portafolio_agregada,
+        'matriz_correlacion_empirica': matriz_emp
     }
     
     if not OUTPUT_DIR.exists():
