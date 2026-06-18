@@ -14,13 +14,13 @@ import scipy.stats as stats
 import config 
 
 # =============================================================================
-# 1. CONFIGURACIÓN DE RUTAS AGUANÓSTICAS (ENFOQUE MVP)
+# 1. CONFIGURACIÓN DE RUTAS AGNÓSTICAS (ENFOQUE MVP)
 # =============================================================================
-# Determina la ubicación del script actual de forma dinámica
-BASE_DIR = Path(__file__).resolve().parent
+#Determina la raíz del proyecto retrocediendo desde src/bloque_1_pricing/
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-DATASET_A_PATH = BASE_DIR / "data" / "dataset_a"
-OUTPUT_DIR = BASE_DIR / "data" / "outputs"
+DATASET_A_PATH = REPO_ROOT / "data" / "dataset_a"
+OUTPUT_DIR = REPO_ROOT / "data" / "outputs"
 OUTPUT_FILE = OUTPUT_DIR / "empirical_parameters.pkl"
 
 # Aseguramos la existencia del directorio de salidas

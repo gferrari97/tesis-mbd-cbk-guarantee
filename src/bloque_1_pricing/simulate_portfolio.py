@@ -18,13 +18,13 @@ import config
 np.random.seed(42)
 ITERACIONES = 10000
 
-# Determina la ubicación del script actual de forma dinámica
-BASE_DIR = Path(__file__).resolve().parent
+# Determina la raíz del proyecto retrocediendo desde src/bloque_1_pricing/
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Configuración de rutas agnósticas para el simulador
-INPUT_PARAMS_FILE = BASE_DIR / "data" / "outputs" / "empirical_parameters.pkl"
-DATASET_A_PATH = BASE_DIR / "data" / "dataset_a"
-OUTPUT_DIR = BASE_DIR / "data" / "outputs"
+INPUT_PARAMS_FILE = REPO_ROOT / "data" / "outputs" / "empirical_parameters.pkl"
+DATASET_A_PATH = REPO_ROOT / "data" / "dataset_a"
+OUTPUT_DIR = REPO_ROOT / "data" / "outputs"
 OUTPUT_SIM_FILE = OUTPUT_DIR / "portfolio_simulations.pkl"
 
 def extraer_cholesky_empirico():

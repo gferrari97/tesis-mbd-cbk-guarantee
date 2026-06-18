@@ -8,10 +8,13 @@ import config
 # =============================================================================
 # 1. CONFIGURACIÓN DE RUTAS Y REGLAS DE NEGOCIO
 # =============================================================================
-INPUT_SIM_FILE = Path("data/outputs/portfolio_simulations.pkl")
-OUTPUT_PLOT_PORTFOLIO = Path("data/outputs/var_portafolio_agregado.png")
-OUTPUT_PLOT_COMPARISON = Path("data/outputs/var_comparativa_densidad.png")
-OUTPUT_PLOT_HEATMAP = Path("data/outputs/heatmap_correlacion.png")
+# Determina la raíz del proyecto retrocediendo desde src/bloque_1_pricing/
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+INPUT_SIM_FILE = REPO_ROOT / "data" / "outputs" / "portfolio_simulations.pkl"
+OUTPUT_PLOT_PORTFOLIO = REPO_ROOT / "data" / "outputs" / "var_portafolio_agregado.png"
+OUTPUT_PLOT_COMPARISON = REPO_ROOT / "data" / "outputs" / "var_comparativa_densidad.png"
+OUTPUT_PLOT_HEATMAP = REPO_ROOT / "data" / "outputs" / "heatmap_correlacion.png"
 
 MARK_UP_OPERATIVO = 1.20
 PERCENTIL_PRICING = 95
