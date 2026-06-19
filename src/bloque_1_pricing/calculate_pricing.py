@@ -1,15 +1,18 @@
+import sys
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from pathlib import Path
-import config
 
 # =============================================================================
 # 1. CONFIGURACIÓN DE RUTAS Y REGLAS DE NEGOCIO
 # =============================================================================
-# Determina la raíz del proyecto retrocediendo desde src/bloque_1_pricing/
+# Determina e inyecta la raíz del proyecto retrocediendo desde src/bloque_1_pricing/
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(REPO_ROOT))
+
+import config
 
 INPUT_SIM_FILE = REPO_ROOT / "data" / "outputs" / "portfolio_simulations.pkl"
 OUTPUT_PLOT_PORTFOLIO = REPO_ROOT / "data" / "outputs" / "var_portafolio_agregado.png"

@@ -7,17 +7,20 @@ OBJETIVO: Ajuste paramétrico mediante Estimación por Máxima Verosimilitud (ML
           parámetros empíricos que consumirá el simulador de Monte Carlo.
 """
 
+import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-import config 
 
 # =============================================================================
 # 1. CONFIGURACIÓN DE RUTAS AGNÓSTICAS (ENFOQUE MVP)
 # =============================================================================
-#Determina la raíz del proyecto retrocediendo desde src/bloque_1_pricing/
+# Determina e inyecta la raíz del proyecto retrocediendo desde src/bloque_1_pricing/
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(REPO_ROOT))
+
+import config
 
 DATASET_A_PATH = REPO_ROOT / "data" / "dataset_a"
 OUTPUT_DIR = REPO_ROOT / "data" / "outputs"

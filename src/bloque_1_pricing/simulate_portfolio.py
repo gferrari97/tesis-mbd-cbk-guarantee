@@ -7,10 +7,10 @@ OBJETIVO: Motor de simulación estocástica vectorizado (10.000 iteraciones) par
           empírica del Dataset A y sentar las bases del Pricing del producto.
 """
 
+import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import config
 
 # =============================================================================
 # 1. RESTRICCIONES DE INGENIERÍA Y GOBERNANZA (MVP)
@@ -18,8 +18,11 @@ import config
 np.random.seed(42)
 ITERACIONES = 10000
 
-# Determina la raíz del proyecto retrocediendo desde src/bloque_1_pricing/
+# Determina e inyecta la raíz del proyecto retrocediendo desde src/bloque_1_pricing/
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(REPO_ROOT))
+
+import config
 
 # Configuración de rutas agnósticas para el simulador
 INPUT_PARAMS_FILE = REPO_ROOT / "data" / "outputs" / "empirical_parameters.pkl"

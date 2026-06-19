@@ -7,8 +7,15 @@ OBJETIVO: Generador del Dataset A (Pasado/Agregado) con Autocorrelación AR(1),
 """
 
 import os
+import sys
+from pathlib import Path
 import numpy as np
 import pandas as pd
+
+# Inyección del Path raíz
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(REPO_ROOT))
+
 import config
 
 def run_dataset_a_generation():
