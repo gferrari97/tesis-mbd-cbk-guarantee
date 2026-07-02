@@ -96,6 +96,14 @@ CORRELATION_MATRIX = np.array([
 # =============================================================================
 COSTO_VARIABLE_ANALISTA_CBK = 2.0  # USD por contracargo procesado manualmente
 
+# Curva de maduración estática del fraude (IBNR)
+# Valores derivados empíricamente de la distribución de tiempos de consolidación del Dataset A
+CBK_MATURATION_CURVE = {
+    1: 0.25,  # Al cierre del mes 1, asume recibido el 25% del fraude total de la cohorte
+    2: 0.70,  # Al cierre del mes 2, asume recibido el 70% del fraude total de la cohorte
+    3: 0.95,  # Al cierre del mes 3, asume recibido el 95% del fraude total de la cohorte
+    4: 1.00   # A partir del mes 4, la cohorte se considera 100% madurada y consolidada
+}
 # Diccionario de estacionalidad por mes calendario (Clave: Mes int)
 # Estructura: 'Nombre_Merchant': {mes: (multiplicador_tpv, multiplicador_cbk_rate)}
 ESTACIONALIDAD_CONFIG = {
