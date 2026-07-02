@@ -12,3 +12,6 @@ venv/
 
 # Exclusión absoluta de la capa de datos locales
 data/
+
+# Excluir bases de datos operacionales locales
+data/operacional/*.db
