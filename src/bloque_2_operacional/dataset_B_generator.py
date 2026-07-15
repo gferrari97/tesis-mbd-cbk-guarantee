@@ -171,7 +171,7 @@ def inject_data_quality_anomalies(df):
     
     return df
 
-def run_daily_batch():
+def run_daily_batch(target_date_str):
     """
     ===========================================================================
     BLOQUE 6: ORQUESTADOR PRINCIPAL (PERSISTENCIA DML)
@@ -179,9 +179,9 @@ def run_daily_batch():
     """
     print("=== INICIANDO CRON DE INGESTA DIARIA (DATASET B) ===")
     
-    # Marca de tiempo de ejecución
-    today_simulated = datetime.now(timezone.utc)
-    print(f"[*] Fecha de procesamiento (UTC): {today_simulated.strftime('%Y-%m-%dT%H:%M:%S')}")
+    # Marca de tiempo de ejecución parametrizada
+    today_simulated = datetime.strptime(target_date_str, '%Y-%m-%d')
+    print(f"[*] Fecha de procesamiento simulada: {today_simulated.strftime('%Y-%m-%d')}")
     
     if not DB_PATH.exists():
         raise FileNotFoundError(f"Error Crítico: No se encontró la base operativa en {DB_PATH}.")
@@ -213,4 +213,9 @@ def run_daily_batch():
     print("=== PROCESO BATCH FINALIZADO ===")
 
 if __name__ == "__main__":
-    run_daily_batch()
+    import argparse
+    parser = argparse.ArgumentParser(description='Generador de Tráfico Transaccional Diario')
+    parser.add_argument('--target_date', type=str, required=True, help='Fecha virtual (YYYY-MM-DD)')
+    args = parser.parse_args()
+    
+    run_daily_batch(args.target_date)
