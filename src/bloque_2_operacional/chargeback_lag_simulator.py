@@ -67,29 +67,45 @@ def simulate_delayed_chargebacks(target_date_str):
 
         registros_cbk = []
         
-        # 3. Asignación probabilística basada en la matriz genética
+        # Extracción en memoria de contracargos preexistentes para exclusión
+        query_existentes = "SELECT transaction_id FROM Chargebacks_Gtee"
+        df_existentes = pd.read_sql_query(query_existentes, conn)
+        
+        # 3. Asignación probabilística distribuida en el tiempo
         for merchant_id in config.MERCHANT_ORDER:
             cfg = config.MERCHANTS_CONFIG[merchant_id]
             tasa_fraude_teorica = cfg['cbk_rate_base']
             
+            # [TRAMPA 4: NEGATIVE_FRAUD_BALANCE]
+            if merchant_id == 'Retail_2' and target_date_str == '2026-08-28':
+                print(f"[!] STRESS TEST: Ataque masivo de fraude para Retail_2")
+                tasa_fraude_teorica = 0.90 
+            
             df_merch = df_vulnerables[df_vulnerables['merchant_id'] == merchant_id]
-            if df_merch.empty:
+            
+            # Exclusión vectorial en memoria (preservando el volumen real de riesgo)
+            df_potenciales = df_merch[~df_merch['transaction_id'].isin(df_existentes['transaction_id'])]
+            
+            if df_potenciales.empty:
                 continue
                 
-            # Calcular volumen real extraído y derivar cantidad de fraudes
-            volumen_tx = len(df_merch)
-            fraudes_esperados = np.random.binomial(n=volumen_tx, p=tasa_fraude_teorica)
+            volumen_potencial = len(df_potenciales)
+            
+            # Derivación de tasa diaria (ventana de 75 días: T-90 a T-15)
+            probabilidad_diaria = tasa_fraude_teorica / 75.0
+            
+            fraudes_esperados = np.random.binomial(n=volumen_potencial, p=probabilidad_diaria)
             
             if fraudes_esperados > 0:
-                # Muestreo aleatorio para simular vulneración de identidades
-                df_fraud = df_merch.sample(n=fraudes_esperados)
+                # Muestreo seguro limitando al volumen potencial disponible
+                df_fraud = df_potenciales.sample(n=min(fraudes_esperados, volumen_potencial))
                 
                 for _, row in df_fraud.iterrows():
                     registros_cbk.append({
                         'chargeback_id': str(uuid.uuid4()),
                         'transaction_id': row['transaction_id'],
-                        'cbk_usd_amount': row['usd_amount'], # Arrastre exacto del monto original
-                        'reason_code': 'Fraud',          # Filtro de fraude real
+                        'cbk_usd_amount': row['usd_amount'], 
+                        'reason_code': 'Fraud',          
                         'cbk_timestamp': target_date.strftime('%Y-%m-%dT%H:%M:%S')
                     })
                     

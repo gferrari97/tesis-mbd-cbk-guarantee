@@ -139,7 +139,7 @@ def evaluate_guardrails(target_date_str):
         SELECT 
             t.merchant_id,
             strftime('%Y-%m', t.transaction_timestamp) as cohort_month,
-            SUM(t.usd_amount * m.fee_assigned) as total_fees,
+            SUM(t.usd_amount * (m.fee_assigned / 100.0)) as total_fees,
             SUM(c.cbk_usd_amount) as total_cbk_raw,
             COUNT(c.chargeback_id) as total_cbk_count,
             MAX(m.cbk_process_cost) as unit_cbk_cost,
@@ -148,6 +148,7 @@ def evaluate_guardrails(target_date_str):
         JOIN Merchants_Gtee m ON t.merchant_id = m.merchant_id
         LEFT JOIN Chargebacks_Gtee c ON t.transaction_id = c.transaction_id
         WHERE t.transaction_timestamp >= '{four_months_ago}'
+        AND t.status = 'APPROVED'
         GROUP BY t.merchant_id, cohort_month
     """
     df_cohorts = pd.read_sql_query(query_cohorts, conn)
@@ -190,9 +191,18 @@ def evaluate_guardrails(target_date_str):
             projected_loss = cbk_raw / factor_seguro
             projected_cbk_count = cbk_count / factor_seguro
             
-            # Deducción de costos operativos
+            # Prorrateo temporal del costo fijo operativo
+            if month_diff == 0:
+                # Mes en curso: se cobra la fracción de los días operados
+                dias_transcurridos = target_date.day
+                costo_fijo_aplicable = row['monthly_analyst_cost'] * (dias_transcurridos / 30.0)
+            else:
+                # Meses anteriores: se asume el mes completo
+                costo_fijo_aplicable = row['monthly_analyst_cost']
+            
+            # Deducción de costos operativos totales (Fijo prorrateado + Variable)
             total_process_cost = projected_cbk_count * row['unit_cbk_cost']
-            analyst_cost = row['monthly_analyst_cost']
+            analyst_cost = costo_fijo_aplicable + (projected_cbk_count * config.COSTO_VARIABLE_ANALISTA_CBK)
             
             fraud_balance_proyectado = fees - projected_loss - total_process_cost - analyst_cost
             
@@ -228,7 +238,8 @@ def evaluate_guardrails(target_date_str):
             df_alerts.to_sql('Guardrails_Log', con=conn, if_exists='append', index=False)
             print(f"[!] ATENCIÓN: Se insertaron {len(alertas_a_insertar)} alertas en Guardrails_Log.")
             for _, alert in df_alerts.iterrows():
-                print(f"    -> [{alert['merchant_id']}] {alert['alert_type']} | Acción: {alert['action_taken']}")
+                # Inyección del ícono de alerta visual en el output de consola
+                print(f"    -> 🚨 [{alert['merchant_id']}] {alert['alert_type']} | Acción: {alert['action_taken']}")
         except sqlite3.IntegrityError as e:
             print(f"[-] Error de integridad al insertar en Guardrails_Log: {e}")
     else:

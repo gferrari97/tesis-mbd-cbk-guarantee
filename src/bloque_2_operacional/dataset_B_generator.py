@@ -90,6 +90,11 @@ def generate_daily_transactions(target_date):
     for merchant_id in config.MERCHANT_ORDER:
         cfg = config.MERCHANTS_CONFIG[merchant_id]
         
+        # [TRAMPA 1: DATA_SILENCE]
+        if merchant_id == 'Travel_1' and target_date.strftime('%Y-%m-%d') == '2026-08-25':
+            print(f"[!] STRESS TEST: Apagado de tráfico (DATA_SILENCE) para Travel_1")
+            continue 
+
         # Derivación de la Tasa Media Diaria (Lambda)
         volumen_mensual_esperado = cfg['tpv_base_usd'] / cfg['avg_ticket']
         lambda_diario = volumen_mensual_esperado / 30.0
@@ -98,10 +103,12 @@ def generate_daily_transactions(target_date):
         tx_qty = np.random.poisson(lambda_diario)
         
         for _ in range(tx_qty):
-            # -----------------------------------------------------------------
-            # 4.1. Generación del Monto (Normal Dist)
-            # -----------------------------------------------------------------
-            monto_tx = max(1.0, np.random.normal(cfg['avg_ticket'], cfg['avg_ticket'] * 0.15))
+            # [TRAMPA 2: TRAFFIC_DEVIATION]
+            if merchant_id == 'Retail_1' and target_date.strftime('%Y-%m-%d') == '2026-08-26':
+                # Incremento del 50% para quebrar el umbral teórico del 20%
+                monto_tx = max(1.0, np.random.normal(cfg['avg_ticket'] * 1.5, cfg['avg_ticket'] * 0.15))
+            else:
+                monto_tx = max(1.0, np.random.normal(cfg['avg_ticket'], cfg['avg_ticket'] * 0.15))
             
             # -----------------------------------------------------------------
             # 4.2. Heurística de Identidad (80% Nuevos / 20% Recurrentes)
@@ -137,21 +144,24 @@ def generate_daily_transactions(target_date):
             
     return pd.DataFrame(registros)
 
-def inject_data_quality_anomalies(df):
+def inject_data_quality_anomalies(df, target_date):
     """
     ===========================================================================
     BLOQUE 5: INYECCIÓN ESTRUCTURAL DE ANOMALÍAS (API OUTAGE)
     ===========================================================================
-    Simula caídas esporádicas en la transmisión de datos. 
-    En un día normal, el ruido basal es < 0.1%.
-    Hay una probabilidad baja (ej. 5%) de que ocurra un 'Apagón de API', 
-    donde el 30% - 70% de los registros pierden el device_id.
     """
     if len(df) == 0:
         return df
+
+    # [TRAMPA 3: DATA_QUALITY_BREACH]
+    if target_date.strftime('%Y-%m-%d') == '2026-08-27':
+        print(f"[!] STRESS TEST: Corrupción de device_id (>5%) para Gaming_1")
+        mascara_gaming = (df['merchant_id'] == 'Gaming_1') & (np.random.rand(len(df)) < 0.15)
+        df.loc[mascara_gaming, 'device_id'] = None
+        return df # Retorna inmediatamente para no aplicar la falla estocástica general
         
     # 1. ¿Ocurrió una falla masiva de red en este lote diario? (5% de probabilidad)
-    es_dia_de_falla = random.random() < 0.05
+    es_dia_de_falla = random.random() < 0.00  #actualmente Apagado porque ya agregamos las trampas
     
     if es_dia_de_falla:
         # Falla masiva: se apaga gran parte de la volumetría
@@ -197,7 +207,7 @@ def run_daily_batch(target_date_str):
         print(f"[*] Volumen orgánico simulado: {len(df_lote)} intentos de pago (Aprobados y Rechazados).")
         
         # Fase 3: Contaminación de Datos
-        df_lote = inject_data_quality_anomalies(df_lote)
+        df_lote = inject_data_quality_anomalies(df_lote, today_simulated)
         
         # Fase 4: Persistencia Física
         df_lote.to_sql('Transactions_Gtee', con=conn, if_exists='append', index=False)

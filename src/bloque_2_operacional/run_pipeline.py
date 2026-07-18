@@ -16,7 +16,7 @@ from pathlib import Path
 # CONFIGURACIÓN DEL ESPACIO TEMPORAL (RANGO DE SIMULACIÓN)
 # =============================================================================
 # Continuamos desde el último día que simulamos a mano
-START_DATE = '2026-08-17'
+START_DATE = '2026-08-01'
 END_DATE = '2026-08-31'
 
 BASE_DIR = Path(__file__).resolve().parent
