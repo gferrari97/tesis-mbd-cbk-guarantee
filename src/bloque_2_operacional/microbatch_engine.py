@@ -139,6 +139,7 @@ def evaluate_guardrails(target_date_str):
         SELECT 
             t.merchant_id,
             strftime('%Y-%m', t.transaction_timestamp) as cohort_month,
+            SUM(t.usd_amount) as total_tpv,
             SUM(t.usd_amount * (m.fee_assigned / 100.0)) as total_fees,
             SUM(c.cbk_usd_amount) as total_cbk_raw,
             COUNT(c.chargeback_id) as total_cbk_count,
@@ -184,12 +185,26 @@ def evaluate_guardrails(target_date_str):
                 
             # Proyección Actuarial IBNR y de Costos
             fees = row['total_fees']
+            tpv_aprobado = row['total_tpv']
             cbk_raw = row['total_cbk_raw']
             cbk_count = row['total_cbk_count']
             
             factor_seguro = max(maturation_factor, 0.01) 
-            projected_loss = cbk_raw / factor_seguro
-            projected_cbk_count = cbk_count / factor_seguro
+            
+            # A. Proyección Empírica
+            projected_loss_empirica = cbk_raw / factor_seguro
+            projected_count_empirica = cbk_count / factor_seguro
+
+            # B. Proyección Teórica (Piso IBNR)
+            tasa_base = config.MERCHANTS_CONFIG[merchant_id]['cbk_rate_base']
+            ticket_medio = config.MERCHANTS_CONFIG[merchant_id]['avg_ticket']
+            
+            expected_loss_teorica = tpv_aprobado * tasa_base
+            expected_count_teorica = expected_loss_teorica / ticket_medio
+
+            # C. Asignación Conservadora
+            projected_loss = max(projected_loss_empirica, expected_loss_teorica)
+            projected_cbk_count = max(projected_count_empirica, expected_count_teorica)
             
             # Prorrateo temporal del costo fijo operativo
             if month_diff == 0:
