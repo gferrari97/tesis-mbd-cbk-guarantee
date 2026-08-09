@@ -1,21 +1,25 @@
 """
 PROYECTO: Tesis Máster Big Data ORT - Guzmán Ferrari
 SCRIPT: dashboard_app.py
-OBJETIVO: Interfaz visual de página única para monitoreo operativo y financiero (Soporte IBNR y Tooltips Nativos).
+OBJETIVO: Interfaz visual de página única para monitoreo operativo y financiero (Líneas de Umbral).
 """
 
-import streamlit as st
+import sys
 import sqlite3
 import pandas as pd
 import altair as alt
+import streamlit as st
 from pathlib import Path
 
 # Configuración de página
 st.set_page_config(page_title="Chargeback Guarantee Monitor", layout="wide")
 
-# Resolución de ruta
+# Resolución de rutas e importación de la Matriz Genética
 CURRENT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = CURRENT_DIR.parent.parent
+sys.path.append(str(REPO_ROOT))
+import config
+
 DB_PATH = REPO_ROOT / 'data' / 'operacional' / 'gtee_operational.db'
 
 @st.cache_data
@@ -63,15 +67,18 @@ def load_and_process_data():
         df_cbk = pd.read_sql_query(query_cbk, conn)
         df_alerts = pd.read_sql_query(query_alerts, conn)
 
-    # Cruce de datos y cálculo financiero base
+    # Cruce de datos y cálculo financiero base (Sin producto cartesiano global)
     df = pd.merge(df_tx, df_cbk, on=['date', 'merchant_id'], how='left').fillna(0)
     df['revenue'] = df['tpv'] * (df['fee_assigned'] / 100.0)
     df['daily_opex'] = (df['analyst_cost'] / 30.0) + (df['cbk_qty'] * df['cbk_process_cost'])
     
     # Cálculo de métricas nominales
     df['nominal_fraud_balance'] = df['revenue'] - df['cbk_usd'] - df['daily_opex']
-    df['cbk_rate_pct'] = (df['cbk_usd'] / df['tpv']) * 100
-    df['cbk_rate_pct'] = df['cbk_rate_pct'].fillna(0)
+    
+    # Protección vectorizada contra división por cero
+    df['cbk_rate_pct'] = 0.0
+    mask_tpv = df['tpv'] > 0
+    df.loc[mask_tpv, 'cbk_rate_pct'] = (df.loc[mask_tpv, 'cbk_usd'] / df.loc[mask_tpv, 'tpv']) * 100
     
     # Aplicación de curva IBNR para Fraud Balance Proyectado
     df['date_dt'] = pd.to_datetime(df['date'])
@@ -92,8 +99,8 @@ def load_and_process_data():
     df['projected_fraud_balance'] = df['revenue'] - df['projected_cbk_usd'] - df['daily_opex']
     
     # Tasa de fraude proyectada IBNR
-    df['projected_cbk_rate_pct'] = (df['projected_cbk_usd'] / df['tpv']) * 100
-    df['projected_cbk_rate_pct'] = df['projected_cbk_rate_pct'].fillna(0)
+    df['projected_cbk_rate_pct'] = 0.0
+    df.loc[mask_tpv, 'projected_cbk_rate_pct'] = (df.loc[mask_tpv, 'projected_cbk_usd'] / df.loc[mask_tpv, 'tpv']) * 100
 
     # Cálculo acumulado proyectado
     df = df.sort_values(by=['merchant_id', 'date'])
@@ -170,17 +177,21 @@ st.markdown("---")
 st.markdown("**Evolución del Fraud Balance Acumulado Proyectado (USD)**")
 chart_fb_data = df_filtered[['date', 'merchant_id', 'fb_acumulado_proyectado']].copy()
 
-line_fb = alt.Chart(chart_fb_data).mark_line(interpolate='monotone', point=True).encode(
-    x=alt.X('date:T', title='Fecha'),
+base_fb = alt.Chart(chart_fb_data).encode(x=alt.X('date:T', title='Fecha'))
+line_fb = base_fb.mark_line(interpolate='monotone').encode(
     y=alt.Y('fb_acumulado_proyectado:Q', title='Fraud Balance (USD)', axis=alt.Axis(format='d')),
-    color=alt.Color('merchant_id:N', title='Merchant'),
-    tooltip=[
-        alt.Tooltip('date:T', title='Fecha'), 
-        alt.Tooltip('merchant_id:N', title='Merchant'), 
-        alt.Tooltip('fb_acumulado_proyectado:Q', title='Balance Proyectado (USD)', format=',.0f')
-    ]
+    color=alt.Color('merchant_id:N', title='Merchant')
 )
-st.altair_chart(line_fb, width='stretch')
+points_fb = base_fb.mark_circle(size=60, opacity=1).encode(
+    y='fb_acumulado_proyectado:Q',
+    color='merchant_id:N',
+    tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('merchant_id:N', title='Merchant'), alt.Tooltip('fb_acumulado_proyectado:Q', title='Balance (USD)', format=',.0f')]
+)
+
+# Umbral Crítico Universal para el Fraud Balance (Línea en Cero)
+rule_fb = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(color='red', strokeDash=[4, 4]).encode(y='y:Q')
+
+st.altair_chart((line_fb + points_fb + rule_fb), width='stretch')
 
 # =============================================================================
 # 2. AUDITORÍA OPERACIONAL Y TASA DE RIESGO
@@ -192,22 +203,31 @@ if merchant_seleccionado != 'Portafolio Global':
     
     base_rates = alt.Chart(df_filtered).encode(x=alt.X('date:T', title='Fecha'))
     
-    line_cbk_proj = base_rates.mark_line(color='#ff4b4b', point=True).encode(
-        y=alt.Y('projected_cbk_rate_pct:Q', title='Porcentaje (%)', axis=alt.Axis(format=',.2f')),
-        tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('projected_cbk_rate_pct:Q', title='Tasa Proyectada IBNR (%)', format=',.2f')]
+    line_cbk_proj = base_rates.mark_line(color='#ff4b4b').encode(
+        y=alt.Y('projected_cbk_rate_pct:Q', title='Porcentaje (%)', axis=alt.Axis(format=',.2f'))
+    )
+    points_cbk_proj = base_rates.mark_circle(color='#ff4b4b', size=60, opacity=1).encode(
+        y='projected_cbk_rate_pct:Q',
+        tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('projected_cbk_rate_pct:Q', title='Tasa Proyectada (%)', format=',.2f')]
     )
     
-    line_cbk_nom = base_rates.mark_line(color='#ffcccc', strokeDash=[2, 2], point=True).encode(
-        y=alt.Y('cbk_rate_pct:Q'),
-        tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('cbk_rate_pct:Q', title='Tasa Nominal Realizada (%)', format=',.2f')]
+    line_cbk_nom = base_rates.mark_line(color='#ffcccc', strokeDash=[2, 2]).encode(
+        y=alt.Y('cbk_rate_pct:Q')
+    )
+    points_cbk_nom = base_rates.mark_circle(color='#ffcccc', size=60, opacity=1).encode(
+        y='cbk_rate_pct:Q',
+        tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('cbk_rate_pct:Q', title='Tasa Nominal (%)', format=',.2f')]
     )
     
     line_fee = base_rates.mark_line(color='#0068c9', strokeDash=[5, 5]).encode(
-        y=alt.Y('fee_assigned:Q'),
+        y=alt.Y('fee_assigned:Q')
+    )
+    points_fee = base_rates.mark_circle(color='#0068c9', size=60, opacity=1).encode(
+        y='fee_assigned:Q',
         tooltip=[alt.Tooltip('fee_assigned:Q', title='Fee Asignado (%)', format=',.2f')]
     )
     
-    chart_rates = (line_cbk_proj + line_cbk_nom + line_fee).properties(height=300)
+    chart_rates = (line_cbk_proj + points_cbk_proj + line_cbk_nom + points_cbk_nom + line_fee + points_fee).properties(height=300)
     st.altair_chart(chart_rates, width='stretch')
 
 st.markdown("#### Métricas de Tráfico")
@@ -216,35 +236,66 @@ col_op1, col_op2, col_op3 = st.columns(3)
 with col_op1:
     st.markdown("**Volumen (DATA_SILENCE)**")
     chart_vol = df_filtered[['date', 'merchant_id', 'tx_qty']].copy()
-    line_vol = alt.Chart(chart_vol).mark_line(interpolate='monotone', point=True).encode(
-        x=alt.X('date:T', title='Fecha'),
+    
+    # Producto cartesiano aplicado de forma exclusiva para graficar la caída a cero del volumen
+    todas_las_fechas = pd.date_range(start=chart_vol['date'].min(), end=chart_vol['date'].max()).strftime('%Y-%m-%d')
+    todos_los_merchants = chart_vol['merchant_id'].unique()
+    grid = pd.MultiIndex.from_product([todas_las_fechas, todos_los_merchants], names=['date', 'merchant_id']).to_frame(index=False)
+    chart_vol = pd.merge(grid, chart_vol, on=['date', 'merchant_id'], how='left')
+    chart_vol['tx_qty'] = chart_vol['tx_qty'].fillna(0)
+    
+    base_vol = alt.Chart(chart_vol).encode(x=alt.X('date:T', title='Fecha'))
+    line_vol = base_vol.mark_line(interpolate='monotone').encode(
         y=alt.Y('tx_qty:Q', title='Cantidad Transacciones', axis=alt.Axis(format='d')),
+        color='merchant_id:N'
+    )
+    points_vol = base_vol.mark_circle(size=60, opacity=1).encode(
+        y='tx_qty:Q',
         color='merchant_id:N',
         tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('merchant_id:N', title='Merchant'), alt.Tooltip('tx_qty:Q', title='Volumen', format='d')]
     )
-    st.altair_chart(line_vol, width='stretch')
+    
+    # Umbral visual explícito para Data Silence
+    rule_vol = alt.Chart(pd.DataFrame({'y': [0]})).mark_rule(color='red', strokeDash=[4, 4]).encode(y='y:Q')
+    
+    st.altair_chart((line_vol + points_vol + rule_vol), width='stretch')
 
 with col_op2:
     st.markdown("**Ticket Promedio (TRAFFIC_DEVIATION)**")
     chart_ticket = df_filtered[['date', 'merchant_id', 'avg_ticket']].copy()
-    line_ticket = alt.Chart(chart_ticket).mark_line(interpolate='monotone', point=True).encode(
-        x=alt.X('date:T', title='Fecha'),
+    base_tkt = alt.Chart(chart_ticket).encode(x=alt.X('date:T', title='Fecha'))
+    line_ticket = base_tkt.mark_line(interpolate='monotone').encode(
         y=alt.Y('avg_ticket:Q', title='Ticket Promedio (USD)', axis=alt.Axis(format='d')),
+        color='merchant_id:N'
+    )
+    points_ticket = base_tkt.mark_circle(size=60, opacity=1).encode(
+        y='avg_ticket:Q',
         color='merchant_id:N',
         tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('merchant_id:N', title='Merchant'), alt.Tooltip('avg_ticket:Q', title='USD', format=',.0f')]
     )
-    st.altair_chart(line_ticket, width='stretch')
+    
+    # Inyección condicional del umbral de desviación (+20%) leyendo config.py
+    if merchant_seleccionado != 'Portafolio Global':
+        umbral_desvio = config.MERCHANTS_CONFIG[merchant_seleccionado]['avg_ticket'] * 1.20
+        rule_ticket = alt.Chart(pd.DataFrame({'y': [umbral_desvio]})).mark_rule(color='red', strokeDash=[4, 4]).encode(y='y:Q')
+        st.altair_chart((line_ticket + points_ticket + rule_ticket), width='stretch')
+    else:
+        st.altair_chart((line_ticket + points_ticket), width='stretch')
 
 with col_op3:
     st.markdown("**Rechazo Orgánico (Exógeno)**")
     chart_rej = df_filtered[['date', 'merchant_id', 'rejection_rate_pct']].copy()
-    line_rej = alt.Chart(chart_rej).mark_line(interpolate='monotone', point=True).encode(
-        x=alt.X('date:T', title='Fecha'),
+    base_rej = alt.Chart(chart_rej).encode(x=alt.X('date:T', title='Fecha'))
+    line_rej = base_rej.mark_line(interpolate='monotone').encode(
         y=alt.Y('rejection_rate_pct:Q', title='% Decline Rate', axis=alt.Axis(format=',.1f')),
+        color='merchant_id:N'
+    )
+    points_rej = base_rej.mark_circle(size=60, opacity=1).encode(
+        y='rejection_rate_pct:Q',
         color='merchant_id:N',
         tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('merchant_id:N', title='Merchant'), alt.Tooltip('rejection_rate_pct:Q', title='% Rechazo', format=',.1f')]
     )
-    st.altair_chart(line_rej, width='stretch')
+    st.altair_chart((line_rej + points_rej), width='stretch')
 
 # =============================================================================
 # 3. CALIDAD DE DATOS (DATA QUALITY BREACH)
@@ -252,40 +303,55 @@ with col_op3:
 st.subheader("3. Calidad de Datos Contractual")
 st.markdown("Seguimiento de campos obligatorios en el API de integración. Umbral de suspensión > 5%.")
 
+# Umbral Crítico Universal para Data Quality (Línea en 5%)
+rule_dq = alt.Chart(pd.DataFrame({'y': [5]})).mark_rule(color='red', strokeDash=[4, 4]).encode(y='y:Q')
+
 col_dq1, col_dq2, col_dq3 = st.columns(3)
 
 with col_dq1:
     st.markdown("**Nulos en Device ID**")
     chart_dev = df_filtered[['date', 'merchant_id', 'null_device_pct']].copy()
-    line_dev = alt.Chart(chart_dev).mark_line(interpolate='monotone', point=True).encode(
-        x=alt.X('date:T', title='Fecha'),
+    base_dev = alt.Chart(chart_dev).encode(x=alt.X('date:T', title='Fecha'))
+    line_dev = base_dev.mark_line(interpolate='monotone').encode(
         y=alt.Y('null_device_pct:Q', title='% Nulos', axis=alt.Axis(format=',.1f')),
+        color='merchant_id:N'
+    )
+    points_dev = base_dev.mark_circle(size=60, opacity=1).encode(
+        y='null_device_pct:Q',
         color='merchant_id:N',
         tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('merchant_id:N', title='Merchant'), alt.Tooltip('null_device_pct:Q', title='% Nulos', format=',.1f')]
     )
-    st.altair_chart(line_dev, width='stretch')
+    st.altair_chart((line_dev + points_dev + rule_dq), width='stretch')
 
 with col_dq2:
     st.markdown("**Nulos en IP Address**")
     chart_ip = df_filtered[['date', 'merchant_id', 'null_ip_pct']].copy()
-    line_ip = alt.Chart(chart_ip).mark_line(interpolate='monotone', point=True).encode(
-        x=alt.X('date:T', title='Fecha'),
+    base_ip = alt.Chart(chart_ip).encode(x=alt.X('date:T', title='Fecha'))
+    line_ip = base_ip.mark_line(interpolate='monotone').encode(
         y=alt.Y('null_ip_pct:Q', title='% Nulos', axis=alt.Axis(format=',.1f')),
+        color='merchant_id:N'
+    )
+    points_ip = base_ip.mark_circle(size=60, opacity=1).encode(
+        y='null_ip_pct:Q',
         color='merchant_id:N',
         tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('merchant_id:N', title='Merchant'), alt.Tooltip('null_ip_pct:Q', title='% Nulos', format=',.1f')]
     )
-    st.altair_chart(line_ip, width='stretch')
+    st.altair_chart((line_ip + points_ip + rule_dq), width='stretch')
 
 with col_dq3:
     st.markdown("**Nulos en Documento**")
     chart_doc = df_filtered[['date', 'merchant_id', 'null_doc_pct']].copy()
-    line_doc = alt.Chart(chart_doc).mark_line(interpolate='monotone', point=True).encode(
-        x=alt.X('date:T', title='Fecha'),
+    base_doc = alt.Chart(chart_doc).encode(x=alt.X('date:T', title='Fecha'))
+    line_doc = base_doc.mark_line(interpolate='monotone').encode(
         y=alt.Y('null_doc_pct:Q', title='% Nulos', axis=alt.Axis(format=',.1f')),
+        color='merchant_id:N'
+    )
+    points_doc = base_doc.mark_circle(size=60, opacity=1).encode(
+        y='null_doc_pct:Q',
         color='merchant_id:N',
         tooltip=[alt.Tooltip('date:T', title='Fecha'), alt.Tooltip('merchant_id:N', title='Merchant'), alt.Tooltip('null_doc_pct:Q', title='% Nulos', format=',.1f')]
     )
-    st.altair_chart(line_doc, width='stretch')
+    st.altair_chart((line_doc + points_doc + rule_dq), width='stretch')
 
 # =============================================================================
 # 4. BITÁCORAS Y REGISTROS TRANSACTIONALES
