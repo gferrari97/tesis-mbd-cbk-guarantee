@@ -8,6 +8,7 @@ OBJETIVO: Emulador de flujo transaccional diario (CRON simulado).
 """
 
 import sys
+import json
 from pathlib import Path
 import sqlite3
 import pandas as pd
@@ -30,15 +31,23 @@ DB_PATH = REPO_ROOT / 'data' / 'operacional' / 'gtee_operational.db'
 # 2. PARÁMETROS FIJOS EXÓGENOS (OUTPUT BLOQUE 1)
 # =============================================================================
 # Resultados teóricos del Pricing Estocástico (Monte Carlo - VaR 95%) -- bloque 1
-# Se inyectan de forma estática para mantener la inmutabilidad de la dimensión operativa.
-FEE_OPTIMO_ASIGNADO = {
-    'Gaming_1': 3.929,
-    'Gaming_2': 1.894,
-    'Retail_1': 0.616,
-    'Retail_2': 2.558,
-    'Travel_1': 1.594,
-    'Travel_2': 1.052
-}
+# Se leen del artefacto que exporta calculate_pricing.py (fuente única de verdad),
+# y se inyectan una sola vez para mantener la inmutabilidad de la dimensión operativa.
+FEES_PATH = REPO_ROOT / 'data' / 'outputs' / 'fees_optimos.json'
+
+def load_fees_optimos():
+    if not FEES_PATH.exists():
+        raise FileNotFoundError(
+            f"No se encontró {FEES_PATH}. Correr primero el Bloque 1 (make bloque1)."
+        )
+    with open(FEES_PATH, encoding='utf-8') as f:
+        fees = json.load(f)
+    faltantes = set(config.MERCHANT_ORDER) - set(fees)
+    if faltantes:
+        raise KeyError(f"Fees faltantes en {FEES_PATH}: {sorted(faltantes)}")
+    return fees
+
+FEE_OPTIMO_ASIGNADO = load_fees_optimos()
 
 def sync_merchants(conn):
     """

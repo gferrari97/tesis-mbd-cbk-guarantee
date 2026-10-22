@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 import numpy as np
@@ -18,6 +19,8 @@ INPUT_SIM_FILE = REPO_ROOT / "data" / "outputs" / "portfolio_simulations.pkl"
 OUTPUT_PLOT_PORTFOLIO = REPO_ROOT / "data" / "outputs" / "var_portafolio_agregado.png"
 OUTPUT_PLOT_COMPARISON = REPO_ROOT / "data" / "outputs" / "var_comparativa_densidad.png"
 OUTPUT_PLOT_HEATMAP = REPO_ROOT / "data" / "outputs" / "heatmap_correlacion.png"
+# Contrato de interfaz con el Bloque 2 (dataset_B_generator.py lo consume)
+OUTPUT_FEES = REPO_ROOT / "data" / "outputs" / "fees_optimos.json"
 
 MARK_UP_OPERATIVO = 1.20
 PERCENTIL_PRICING = 95
@@ -80,6 +83,16 @@ def main():
     print(f"Reserva de Portafolio (VaR):    ${var_99_portafolio:,.2f}")
     print(f"Ahorro de Capital (Subaditividad): ${ahorro_capital_covarianza:,.2f}")
     print(f"Expected Shortfall (CVaR 99%):  ${cvar_99_portafolio:,.2f}")
+
+    # =============================================================================
+    # 5.1 PERSISTENCIA DEL FEE ÓPTIMO (INPUT DEL BLOQUE 2)
+    # =============================================================================
+    # Se redondea a 3 decimales, la misma precisión reportada en terminal.
+    OUTPUT_FEES.parent.mkdir(parents=True, exist_ok=True)
+    fees_optimos = {m: round(float(fee_optimo_porcentaje[i]), 3) for i, m in enumerate(config.MERCHANT_ORDER)}
+    with open(OUTPUT_FEES, 'w', encoding='utf-8') as f:
+        json.dump(fees_optimos, f, indent=4)
+    print(f"\n[*] Fees óptimos persistidos en: {OUTPUT_FEES}")
 
     # =============================================================================
     # 6. EXPORTACIÓN DE VISUALIZACIONES ANALÍTICAS (SUBADITIVIDAD)
