@@ -7,6 +7,7 @@ OBJETIVO:
     día por día en un bucle cerrado.
 """
 
+import argparse
 import subprocess
 import pandas as pd
 import sys
@@ -27,8 +28,8 @@ scripts_to_run = [
     "microbatch_engine.py"
 ]
 
-def run_simulation():
-    date_range = pd.date_range(start=START_DATE, end=END_DATE)
+def run_simulation(start_date=START_DATE, end_date=END_DATE):
+    date_range = pd.date_range(start=start_date, end=end_date)
     
     for current_date in date_range:
         target_date_str = current_date.strftime('%Y-%m-%d')
@@ -49,7 +50,12 @@ def run_simulation():
             if resultado.returncode != 0:
                 print(f"\n[!] FALLO CRÍTICO DE EJECUCIÓN en {script} para la fecha {target_date_str}.")
                 print("[!] Abortando el pipeline para proteger la integridad de gtee_operational.db.")
-                return
+                sys.exit(1)
 
 if __name__ == "__main__":
-    run_simulation()
+    parser = argparse.ArgumentParser(description='Orquestador diario del pipeline operacional')
+    parser.add_argument('--start', type=str, default=START_DATE, help='Fecha inicial (YYYY-MM-DD)')
+    parser.add_argument('--end', type=str, default=END_DATE, help='Fecha final inclusive (YYYY-MM-DD)')
+    args = parser.parse_args()
+
+    run_simulation(args.start, args.end)

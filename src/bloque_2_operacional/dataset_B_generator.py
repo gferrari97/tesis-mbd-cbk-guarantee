@@ -36,8 +36,8 @@ FEE_OPTIMO_ASIGNADO = {
     'Gaming_2': 1.894,
     'Retail_1': 0.616,
     'Retail_2': 2.558,
-    'Travel_1': 2.392,
-    'Travel_2': 1.572
+    'Travel_1': 1.594,
+    'Travel_2': 1.052
 }
 
 def sync_merchants(conn):

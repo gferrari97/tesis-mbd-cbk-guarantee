@@ -7,6 +7,7 @@ OBJETIVO: Generador del Dataset A (Pasado/Agregado) con Autocorrelación AR(1),
 """
 
 import os
+import shutil
 import sys
 from pathlib import Path
 import numpy as np
@@ -138,15 +139,24 @@ def run_dataset_a_generation():
     # -------------------------------------------------------------------------
     # 4. PERSISTENCIA EN PARQUET PARTICIONADO (Capa Analítica Local)
     # -------------------------------------------------------------------------
-    output_root = "data/dataset_a"
-    
-    df_dataset_a.to_parquet(
-        output_root,
-        engine='pyarrow',
-        partition_cols=['industry', 'merchant_id'],
-        index=False
-    )
-    
+    output_root = REPO_ROOT / "data" / "dataset_a"
+
+    # Escritura explícita por partición (layout Hive: industry=X/merchant_id=Y).
+    # Se evita partition_cols de pyarrow porque (a) genera nombres GUID que se
+    # acumulan en cada corrida duplicando registros, y (b) pyarrow 24 puede
+    # colgarse en macOS al cerrar su thread pool al salir del intérprete.
+    # Las columnas de partición no se guardan en el archivo: read_parquet las
+    # reconstruye desde la ruta, igual que con partition_cols.
+    shutil.rmtree(output_root, ignore_errors=True)
+    for (industry, merchant_id), df_part in df_dataset_a.groupby(['industry', 'merchant_id']):
+        partition_dir = output_root / f"industry={industry}" / f"merchant_id={merchant_id}"
+        partition_dir.mkdir(parents=True, exist_ok=True)
+        df_part.drop(columns=['industry', 'merchant_id']).to_parquet(
+            partition_dir / "part-0.parquet",
+            engine='pyarrow',
+            index=False
+        )
+
     print(f"-> Éxito: Dataset A guardado en '{output_root}/'. Total registros: {len(df_dataset_a)}")
     print("=== PROCESO DE LA SEMANA 1 FINALIZADO CON ÉXITO ===")
 
