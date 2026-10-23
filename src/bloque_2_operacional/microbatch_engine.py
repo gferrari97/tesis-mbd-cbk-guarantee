@@ -14,8 +14,8 @@ LÓGICA DE ALERTAS:
 import sys
 import argparse
 import sqlite3
+import random
 import pandas as pd
-import uuid
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from pathlib import Path
@@ -39,6 +39,8 @@ FALLBACK_MATURATION_CURVE = {
 
 def evaluate_guardrails(target_date_str):
     target_date = datetime.strptime(target_date_str, '%Y-%m-%d')
+    # Semilla diaria: solo afecta a los log_id (UUID) del Guardrails_Log
+    random.seed(config.seed_diaria(target_date_str, config.SEED_OFFSET_MICROBATCH))
     print("\n=======================================================")
     print(f"[*] MOTOR MICRO-BATCH: EVALUACIÓN DE GUARDRAILS ({target_date_str})")
     print("=======================================================")
@@ -89,7 +91,7 @@ def evaluate_guardrails(target_date_str):
         # Regla 1: Silencio de Datos (Data Silence)
         if df_merch_daily.empty:
             alertas_a_insertar.append({
-                'log_id': str(uuid.uuid4()),
+                'log_id': config.uuid_determinista(),
                 'merchant_id': merchant_id,
                 'alert_type': 'DATA_SILENCE',
                 'triggered_date': target_date.strftime('%Y-%m-%dT%H:%M:%S'),
@@ -110,7 +112,7 @@ def evaluate_guardrails(target_date_str):
                 
         if breach_detectado:
             alertas_a_insertar.append({
-                'log_id': str(uuid.uuid4()),
+                'log_id': config.uuid_determinista(),
                 'merchant_id': merchant_id,
                 'alert_type': 'DATA_QUALITY_BREACH',
                 'triggered_date': target_date.strftime('%Y-%m-%dT%H:%M:%S'),
@@ -124,7 +126,7 @@ def evaluate_guardrails(target_date_str):
         
         if desvio_pct > 0.20:
             alertas_a_insertar.append({
-                'log_id': str(uuid.uuid4()),
+                'log_id': config.uuid_determinista(),
                 'merchant_id': merchant_id,
                 'alert_type': 'TRAFFIC_DEVIATION',
                 'triggered_date': target_date.strftime('%Y-%m-%dT%H:%M:%S'),
@@ -237,7 +239,7 @@ def evaluate_guardrails(target_date_str):
                 
         if balance_negativo_detectado:
             alertas_a_insertar.append({
-                'log_id': str(uuid.uuid4()),
+                'log_id': config.uuid_determinista(),
                 'merchant_id': merchant_id,
                 'alert_type': 'NEGATIVE_FRAUD_BALANCE',
                 'triggered_date': target_date.strftime('%Y-%m-%dT%H:%M:%S'),

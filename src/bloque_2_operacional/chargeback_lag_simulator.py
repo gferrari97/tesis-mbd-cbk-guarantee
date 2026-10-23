@@ -15,9 +15,9 @@ LÓGICA:
 import sys
 import argparse
 import sqlite3
+import random
 import pandas as pd
 import numpy as np
-import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -34,6 +34,10 @@ def simulate_delayed_chargebacks(target_date_str):
     la latencia de las redes de pago (Visa/Mastercard).
     """
     target_date = datetime.strptime(target_date_str, '%Y-%m-%d')
+    # Semilla diaria: binomial, df.sample (usa el estado global de NumPy) y UUIDs
+    seed = config.seed_diaria(target_date_str, config.SEED_OFFSET_CBK_LAG)
+    np.random.seed(seed)
+    random.seed(seed)
     print("\n=======================================================")
     print(f"[*] SIMULADOR DE CHARGEBACK LAG (FECHA: {target_date_str})")
     print("=======================================================")
@@ -58,6 +62,7 @@ def simulate_delayed_chargebacks(target_date_str):
             FROM Transactions_Gtee 
             WHERE status = 'APPROVED' 
             AND transaction_timestamp BETWEEN '{window_start}' AND '{window_end}'
+            ORDER BY rowid
         """
         df_vulnerables = pd.read_sql_query(query_tx, conn)
         
@@ -102,7 +107,7 @@ def simulate_delayed_chargebacks(target_date_str):
                 
                 for _, row in df_fraud.iterrows():
                     registros_cbk.append({
-                        'chargeback_id': str(uuid.uuid4()),
+                        'chargeback_id': config.uuid_determinista(),
                         'transaction_id': row['transaction_id'],
                         'cbk_usd_amount': row['usd_amount'], 
                         'reason_code': 'Fraud',          

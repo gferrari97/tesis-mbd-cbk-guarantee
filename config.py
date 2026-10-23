@@ -112,3 +112,27 @@ ESTACIONALIDAD_CONFIG = {
     'Travel_1': {1: (1.30, 1.00), 2: (1.30, 1.00)},  # Temporada estival austral
     'Travel_2': {1: (1.30, 1.00), 2: (1.30, 1.00)}
 }
+
+
+# =============================================================================
+# 5. REPRODUCIBILIDAD DEL BLOQUE 2 (SEMILLAS DIARIAS)
+# =============================================================================
+# Cada script del pipeline diario se re-siembra con una semilla derivada de la
+# fecha simulada: un mismo día produce el mismo lote tanto si se corre el mes
+# completo como si se corre ese día aislado (p. ej. demo.sh warm-up + en vivo).
+SEED_OPERACIONAL = 42
+
+# Desplazamientos para que cada script use un flujo aleatorio independiente
+SEED_OFFSET_DATASET_B = 0
+SEED_OFFSET_CBK_LAG = 1
+SEED_OFFSET_MICROBATCH = 2
+
+def seed_diaria(target_date_str, offset=0):
+    """Semilla determinística para la fecha simulada 'YYYY-MM-DD'."""
+    return (SEED_OPERACIONAL + int(target_date_str.replace("-", ""))) * 10 + offset
+
+def uuid_determinista():
+    """UUID v4 tomado del generador 'random' sembrado (reemplaza a uuid.uuid4)."""
+    import random
+    import uuid
+    return str(uuid.UUID(int=random.getrandbits(128), version=4))

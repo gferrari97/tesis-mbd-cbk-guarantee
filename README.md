@@ -66,7 +66,22 @@ El Bloque 1 usa semilla fija (`42`), así que da los mismos resultados en todas 
 
 Portafolio: VaR 99% de USD 80.745,45 contra USD 119.164,05 si se suman las reservas aisladas, lo que da un ahorro de capital de USD 38.418,60. El Expected Shortfall (CVaR 99%) es de USD 85.858,79.
 
-El Bloque 2 simula tráfico sin semilla fija, así que los montos exactos cambian levemente entre corridas. Las anomalías inyectadas son deterministas: por ejemplo, el `DATA_SILENCE` de Travel_1 el 2026-08-25 aparece siempre.
+El Bloque 2 también es determinista. Cada día simulado usa una semilla derivada de su fecha (`config.seed_diaria`), así que un día da el mismo resultado si se corre agosto completo o solo ese día. `make bloque2` siempre genera la misma base:
+
+| Tabla | Registros |
+|---|---|
+| `Transactions_Gtee` | 222.053 |
+| `Chargebacks_Gtee` | 173 |
+| `Guardrails_Log` | 4 |
+
+Las 4 alertas corresponden a las anomalías inyectadas:
+
+| Fecha | Merchant | Alerta | Acción |
+|---|---|---|---|
+| 2026-08-25 | Travel_1 | `DATA_SILENCE` | `MANUAL_REVIEW_REQUIRED` |
+| 2026-08-26 | Retail_1 | `TRAFFIC_DEVIATION` | `LISTEN_MODE_ACTIVATED` |
+| 2026-08-27 | Gaming_1 | `DATA_QUALITY_BREACH` | `COVERAGE_SUSPENDED` |
+| 2026-08-28 | Retail_2 | `NEGATIVE_FRAUD_BALANCE` | `COVERAGE_SUSPENDED` |
 
 ## Datos
 

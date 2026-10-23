@@ -13,7 +13,6 @@ from pathlib import Path
 import sqlite3
 import pandas as pd
 import numpy as np
-import uuid
 import random
 from datetime import datetime, timezone
 
@@ -128,7 +127,7 @@ def generate_daily_transactions(target_date):
             else:
                 # Generar identidad 100% nueva
                 identidad = {
-                    'device_id': str(uuid.uuid4()),
+                    'device_id': config.uuid_determinista(),
                     'ip_address': f"{random.randint(1, 255)}.{random.randint(0, 255)}.{random.randint(0, 255)}.{random.randint(1, 254)}",
                     'document': str(random.randint(10000000, 99999999))
                 }
@@ -141,7 +140,7 @@ def generate_daily_transactions(target_date):
             
             # Ensamblado del registro
             registros.append({
-                'transaction_id': str(uuid.uuid4()),
+                'transaction_id': config.uuid_determinista(),
                 'merchant_id': merchant_id,
                 'usd_amount': round(monto_tx, 2),
                 'transaction_timestamp': base_timestamp,
@@ -200,6 +199,11 @@ def run_daily_batch(target_date_str):
     
     # Marca de tiempo de ejecución parametrizada
     today_simulated = datetime.strptime(target_date_str, '%Y-%m-%d')
+
+    # Semilla diaria: volumen, montos, identidades, anomalías y UUIDs reproducibles
+    seed = config.seed_diaria(target_date_str, config.SEED_OFFSET_DATASET_B)
+    np.random.seed(seed)
+    random.seed(seed)
     print(f"[*] Fecha de procesamiento simulada: {today_simulated.strftime('%Y-%m-%d')}")
     
     if not DB_PATH.exists():
